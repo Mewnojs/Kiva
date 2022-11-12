@@ -607,7 +607,7 @@ namespace Kiva.Graphics
                         if (notesHitSum < 0) notesHitSum = 0;
                         notesPassedPerFrame.Add(notesHitSum);
                         notesPassedTimes.Add(time);
-                        while (!notesPassedTimes.ZeroLen && notesPassedTimes.First < time - 1)
+                        while (!notesPassedTimes.ZeroLen && notesPassedTimes.First < time - Constants.TimeToInt(1))
                         {
                             notesPassedPerFrame.Pop();
                             notesPassedTimes.Pop();
