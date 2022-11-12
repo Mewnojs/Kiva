@@ -22,6 +22,7 @@ namespace Kiva.MIDI
         public long noteCount;
         int midiNoteEventCount = 0;
         int midiControlEventCount = 0;
+        int midiSysexEventCount = 0;
         public int[] noteCounts = new int[256];
         public int[] colorEventCounts = new int[16];
         public int[] currColorEventIndx = new int[16];
@@ -34,8 +35,10 @@ namespace Kiva.MIDI
         public ColorEvent[][] ColorEvents = new ColorEvent[16][];
         public MIDIEvent[] NoteEvents = null;
         public MIDIEvent[] ControlEvents = null;
+        public MIDIEvent[] SysexEvents = null;
         int currNoteEventIndex = 0;
         int currControlEventIndex = 0;
+        int currSysexEventIndex = 0;
         int[] currNoteIndexes = new int[256];
 
         public int FirstKey;
@@ -230,6 +233,7 @@ namespace Kiva.MIDI
                             b = reader.Read();
                             data.Add(b);
                         }
+                        midiSysexEventCount++;
                     }
                     else if (command == 0b11110100 || command == 0b11110001 || command == 0b11110101 || command == 0b11111001 || command == 0b11111101)
                     {
@@ -415,6 +419,7 @@ namespace Kiva.MIDI
             }
             NoteEvents = new MIDIEvent[midiNoteEventCount];
             ControlEvents = new MIDIEvent[midiControlEventCount];
+            SysexEvents = new MIDIEvent[midiSysexEventCount];
         }
 
         public void SecondPassParse()
@@ -593,12 +598,19 @@ namespace Kiva.MIDI
                     else if (command == 0b11110000)
                     {
                         List<byte> data = new List<byte>() { command };
+                        byte len = reader.Read();
                         byte b = 0;
                         while (b != 0b11110111)
                         {
                             b = reader.Read();
                             data.Add(b);
                         }
+                        SysexEvents[currSysexEventIndex++] = new MIDIEvent()
+                        {
+                            time = trackSecondsInt,
+                            data = (uint)(command | data[1] << 8 | data[2] << 16 | data[3] << 24),
+                            dataLong = data.ToArray()
+                        };
                     }
                     else if (command == 0b11110100 || command == 0b11110001 || command == 0b11110101 || command == 0b11111001 || command == 0b11111101)
                     {

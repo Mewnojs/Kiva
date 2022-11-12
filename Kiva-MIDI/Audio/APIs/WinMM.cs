@@ -11,6 +11,7 @@ namespace Kiva.Audio.APIs
     {
         internal const int MMSYSERR_NOERROR = 0;
         internal const int CALLBACK_FUNCTION = 0x00030000;
+        internal const int STREAM_BUFFER_LENGTH_MAX = 0xFFFF;
 
         internal delegate void MidiInProc(
             IntPtr hMidiIn,
@@ -37,6 +38,15 @@ namespace Kiva.Audio.APIs
 
         [DllImport("winmm")]
         internal static extern int midiOutShortMsg(IntPtr hMidiOut, uint dwMsg);
+
+        [DllImport("winmm")]
+        internal static extern int midiOutLongMsg(IntPtr hMidiOut, IntPtr lpMidiOutHdr, uint cbMidiOutHdr);
+
+        [DllImport("winmm")]
+        internal static extern int midiOutPrepareHeader(IntPtr hMidiOut, IntPtr lpMidiOutHdr, uint cbMidiOutHdr);
+
+        [DllImport("winmm")]
+        internal static extern int midiOutUnprepareHeader(IntPtr hMidiOut, IntPtr lpMidiOutHdr, uint cbMidiOutHdr);
 
         [DllImport("winmm")]
         internal static extern int midiOutClose(
@@ -132,5 +142,20 @@ namespace Kiva.Audio.APIs
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
         public string szPname;
         public uint dwSupport;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct MIDIHDR
+    {
+        public IntPtr lpData;
+        public uint dwBufferLength;
+        public uint dwBytesRecorded;
+        readonly IntPtr dwUser;
+        public uint dwFlags;
+        readonly IntPtr lpNext;
+        readonly IntPtr reserved;
+        public uint dwOffset;
+        [MarshalAs(UnmanagedType.ByValArray, ArraySubType = UnmanagedType.SysUInt, SizeConst = 8)]
+        readonly IntPtr[] dwReserved;
     }
 }

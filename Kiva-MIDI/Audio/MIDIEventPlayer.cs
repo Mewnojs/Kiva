@@ -80,6 +80,9 @@ namespace Kiva.Audio
         IntPtr device = IntPtr.Zero;
         Task deviceThread = null;
 
+        IntPtr hdr = IntPtr.Zero;
+        IntPtr hdrBuffer = IntPtr.Zero;
+
         CancellationTokenSource cancelConsumer;
 
         public MIDIEventPlayer(KivaSettings settings)
@@ -121,6 +124,7 @@ namespace Kiva.Audio
                     try
                     {
                         tasks.Add(RunPlayerThread(-1));
+                        tasks.Add(RunPlayerThread(-2));
                         for (int i = 0; i < (file as MIDIMemoryFile).MIDINoteEvents.Length; i++)
                         {
                             tasks.Add(RunPlayerThread(i));
@@ -169,6 +173,12 @@ namespace Kiva.Audio
                         events = (file as MIDIMemoryFile).MIDIControlEvents;
                     }
                     catch { return; }
+                else if (i == -2)
+                    try
+                    {
+                        events = (file as MIDIMemoryFile).MIDISysexEvents;
+                    }
+                    catch { return; }
                 else
                     try
                     {
@@ -193,7 +203,7 @@ namespace Kiva.Audio
                             if (file == null) goto dispose;
                         }
                         evid = GetEventPos(events, time) - 10;
-                        if (evid < 0 || i == -1) evid = 0;
+                        if (evid < 0 || i <= -1) evid = 0;
                     }
                     while (evid == events.Length && !changed)
                     {
@@ -206,7 +216,7 @@ namespace Kiva.Audio
                         ResetControllers();
 
                         evid = GetEventPos(events, time) - 10;
-                        if (evid < 0 || i == -1) evid = 0;
+                        if (evid < 0 || i <= -1) evid = 0;
                         changed = false;
                     }
                     lastTime = time;
@@ -228,7 +238,7 @@ namespace Kiva.Audio
                             //NtDelayExecution(false, ref s);
                             Thread.Sleep(new TimeSpan((long)(delay * 10000000 / Constants.TicksPerSecond)));
                         }
-                        if ((eventFeed.Count > events[evid].vel * 100 || delay < -1) && i != -1)
+                        if ((eventFeed.Count > events[evid].vel * 100 || delay < -1) && i > -1)
                             while ((evid < events.Length && events[evid].time < Time.GetTimeInt() && (eventFeed.Count > events[evid].vel * 100 || delay < -1)))
                             {
                                 if (events[evid].vel > 80)
@@ -265,24 +275,58 @@ namespace Kiva.Audio
                 settings.General.SelectedAudioEngine = AudioEngine.WinMM;
                 return;
             }
+            int hdr_size = Marshal.SizeOf(typeof(MIDIHDR));
             try
             {
+                hdrBuffer = Marshal.AllocHGlobal(WinMM.STREAM_BUFFER_LENGTH_MAX); // Maximum buffer size for WinMM API
+                var managed_hdr = new MIDIHDR()
+                {
+                    lpData = hdrBuffer,
+                    dwBufferLength = WinMM.STREAM_BUFFER_LENGTH_MAX,
+                };
+                this.hdr = hdr = Marshal.AllocHGlobal(hdr_size);
+                Marshal.StructureToPtr(managed_hdr, hdr, false);
+                KDMAPI.PrepareLongData(hdr, (uint)hdr_size);
+                managed_hdr = Marshal.PtrToStructure<MIDIHDR>(hdr);
+
                 foreach (var e in eventFeed.GetConsumingEnumerable(cancel))
                 {
-                    KDMAPI.SendDirectDataNoBuf(e.data);
+                    if ((byte)(e.data & 0xFF) == 0b11110000)
+                    {
+
+                        int data_size = e.dataLong.Length;
+                        if (data_size > WinMM.STREAM_BUFFER_LENGTH_MAX)
+                            throw new Exception($"Sysex length exceeded at time {e.time}");
+                        Marshal.Copy(e.dataLong, 0, hdrBuffer, data_size);
+                        managed_hdr.dwBytesRecorded = (uint)data_size;
+                        Marshal.StructureToPtr(managed_hdr, hdr, false);
+
+                        KDMAPI.SendDirectLongData(hdr, (uint)hdr_size);
+                    }
+                    else
+                    {
+                        KDMAPI.SendDirectDataNoBuf(e.data);
+                    }
                     if (deviceID != -1 || disposed) break;
                 }
             }
             catch (OperationCanceledException) { }
+
+            KDMAPI.UnprepareLongData(hdr, (uint)hdr_size);
+            Marshal.FreeHGlobal(hdr);
+            Marshal.FreeHGlobal(hdrBuffer);
+
             KDMAPI.TerminateKDMAPIStream();
         }
 
         void RunEventConsumerWINMM(CancellationToken cancel)
         {
             var id = deviceID;
+            int hdr_size = Marshal.SizeOf(typeof(MIDIHDR));
             try
             {
                 IntPtr device;
+                IntPtr hdr;
                 WinMM.midiOutOpen(out device, id, (
                     IntPtr hMidiOut,
                     uint wMsg,
@@ -292,9 +336,35 @@ namespace Kiva.Audio
                 { }, Process.GetCurrentProcess().Handle, WinMM.CALLBACK_FUNCTION);
                 this.device = device;
                 this.device = device;
+
+                hdrBuffer = Marshal.AllocHGlobal(WinMM.STREAM_BUFFER_LENGTH_MAX); // Maximum buffer size for WinMM API
+                var managed_hdr = new MIDIHDR()
+                {
+                    lpData = hdrBuffer,
+                    dwBufferLength = WinMM.STREAM_BUFFER_LENGTH_MAX,
+                };
+                this.hdr = hdr = Marshal.AllocHGlobal(hdr_size);
+                Marshal.StructureToPtr(managed_hdr, hdr, false);
+                WinMM.midiOutPrepareHeader(device, hdr, (uint)hdr_size);
+                managed_hdr = Marshal.PtrToStructure<MIDIHDR>(hdr);
+                
                 foreach (var e in eventFeed.GetConsumingEnumerable(cancel))
                 {
-                    WinMM.midiOutShortMsg(device, e.data);
+                    if ((byte)(e.data & 0xFF) == 0b11110000)
+                    {
+                        int data_size = e.dataLong.Length;
+                        if (data_size > WinMM.STREAM_BUFFER_LENGTH_MAX) 
+                            throw new Exception($"Sysex length exceeded at time {e.time}");
+                        Marshal.Copy(e.dataLong, 0, hdrBuffer, data_size);
+                        managed_hdr.dwBytesRecorded = (uint)data_size;
+                        Marshal.StructureToPtr(managed_hdr, hdr, false);
+
+                        WinMM.midiOutLongMsg(device, hdr, (uint)hdr_size);
+                    }
+                    else
+                    {
+                        WinMM.midiOutShortMsg(device, e.data);
+                    }
                     if (deviceID != id || disposed) break;
                 }
             }
@@ -302,6 +372,9 @@ namespace Kiva.Audio
             try
             {
                 WinMM.midiOutClose(device);
+                WinMM.midiOutUnprepareHeader(device, hdr, (uint)hdr_size);
+                Marshal.FreeHGlobal(hdr);
+                Marshal.FreeHGlobal(hdrBuffer);
             }
             catch { }
 

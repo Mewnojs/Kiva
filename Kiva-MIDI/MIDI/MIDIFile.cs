@@ -55,6 +55,7 @@ namespace Kiva.MIDI
         public int time;
         public uint data;
         public byte vel;
+        public byte[] dataLong;
     }
 
     [StructLayout(LayoutKind.Sequential)]

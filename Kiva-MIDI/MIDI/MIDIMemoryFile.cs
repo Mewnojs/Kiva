@@ -12,6 +12,9 @@ namespace Kiva
     {
         public MIDIEvent[][] MIDINoteEvents { get; private set; } = null;
         public MIDIEvent[] MIDIControlEvents { get; private set; } = null;
+
+        public MIDIEvent[] MIDISysexEvents { get; private set; } = null;
+
         public int[] FirstRenderNote { get; private set; } = new int[256];
         public int[] FirstUnhitNote { get; private set; } = new int[256];
         public double lastRenderTime { get; set; } = 0;
@@ -104,6 +107,12 @@ namespace Kiva
             List<ColorEvent[]> ce = new List<ColorEvent[]>();
             foreach (var p in parsers) ce.AddRange(p.ColorEvents);
             ColorEvents = ce.ToArray();
+        }
+
+        protected void MergeSysexEvents()
+        {
+            int count = LoaderSettings.EventPlayerThreads;
+            MIDISysexEvents = TimedMerger<MIDIEvent>.MergeMany(parsers.Select(p => p.SysexEvents).ToArray(), e => e.time).ToArray();
         }
 
         protected IEnumerable<Note> RemoveOverlaps(IEnumerable<Note> input)

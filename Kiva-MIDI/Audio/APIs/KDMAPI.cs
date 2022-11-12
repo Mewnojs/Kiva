@@ -101,16 +101,16 @@ namespace Kiva.Audio.APIs
         public static extern uint SendDirectDataNoBuf(uint dwMsg);
 
         [DllImport("OmniMIDI\\OmniMIDI")]
-        public static extern uint SendDirectLongData(ref MIDIHDR IIMidiHdr);
+        public static extern uint SendDirectLongData(IntPtr IIMidiHdr, uint IIMidiHdrSize);
 
         [DllImport("OmniMIDI\\OmniMIDI")]
-        public static extern uint SendDirectLongDataNoBuf(ref MIDIHDR IIMidiHdr);
+        public static extern uint SendDirectLongDataNoBuf(IntPtr MidiHdrData, uint MidiHdrDataLen);
 
         [DllImport("OmniMIDI\\OmniMIDI")]
-        public static extern uint PrepareLongData(ref MIDIHDR IIMidiHdr);
+        public static extern uint PrepareLongData(IntPtr IIMidiHdr, uint IIMidiHdrSize);
 
         [DllImport("OmniMIDI\\OmniMIDI")]
-        public static extern uint UnprepareLongData(ref MIDIHDR IIMidiHdr);
+        public static extern uint UnprepareLongData(IntPtr IIMidiHdr, uint IIMidiHdrSize);
 
         [DllImport("OmniMIDI\\OmniMIDI")]
         public static extern bool DriverSettings(OMSetting Setting, OMSettingMode Mode, IntPtr Value, Int32 cbValue);

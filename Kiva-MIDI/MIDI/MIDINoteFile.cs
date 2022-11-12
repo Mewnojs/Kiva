@@ -30,6 +30,10 @@ namespace Kiva.MIDI
             {
                 MergeControlEvents();
             });
+            var sysEventMerger = Task.Run(() =>
+            {
+                MergeSysexEvents();
+            });
             cancel.ThrowIfCancellationRequested();
             ParseStage = ParsingStage.MergingKeys;
             long noteCount = 0;
@@ -55,6 +59,7 @@ namespace Kiva.MIDI
             ParseStage = ParsingStage.MergingEvents;
             controlEventMerger.GetAwaiter().GetResult();
             eventMerger.GetAwaiter().GetResult();
+            sysEventMerger.GetAwaiter().GetResult();
             ParseStatusText = "Done!";
         }
     }

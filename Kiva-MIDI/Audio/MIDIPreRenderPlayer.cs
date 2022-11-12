@@ -91,6 +91,8 @@ namespace Kiva.Audio
             List<IEnumerable<MIDIEvent>> events = new List<IEnumerable<MIDIEvent>>();
             if (_file.MIDIControlEvents.Length != 0)
                 events.Add(_file.MIDIControlEvents);
+            if (_file.MIDISysexEvents.Length != 0)
+                events.Add(_file.MIDISysexEvents);
             for (int i = 0; i < _file.MIDINoteEvents.Length; i++)
                 if (_file.MIDINoteEvents[i].Length != 0)
                     events.Add(EventArrayEnumerable(_file.MIDINoteEvents[i], time, skipList));

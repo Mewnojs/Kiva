@@ -223,10 +223,18 @@ namespace Kiva.Audio
                 var ev = e.data;
 
                 byte cmd = (byte)(ev & 0xF0);
-
                 int err = 1;
 
-                err = bass.SendEventRaw(ev & 0xFFFFFF, 0);
+                if ((byte)(ev & 0xFF) == 0b11110000)
+                {
+                    var evs = BassMidi.BASS_MIDI_ConvertEvents(e.dataLong.ToArray(), BASSMIDIEventMode.BASS_MIDI_EVENTS_STRUCT);
+                    err = BassMidi.BASS_MIDI_StreamEvents(bass.Handle, BASSMIDIEventMode.BASS_MIDI_EVENTS_STRUCT, evs);
+                }
+                else 
+                {
+                    err = bass.SendEventRaw(ev & 0xFFFFFF, 0);
+                }
+                
                 if (err <= 0)
                 { }
                 if (cancelGenerator.Token.IsCancellationRequested) break;
